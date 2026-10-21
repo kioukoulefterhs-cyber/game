@@ -17,6 +17,7 @@ var _timer_label: Label
 var _hint_button: Button
 var _undo_button: Button
 var _overlay: Control
+var _tip: Label
 var _paused := false
 
 
@@ -55,8 +56,9 @@ func _ready() -> void:
 	board_view.reduce_motion = host.setting("reduce_motion", false)
 	board_view.custom_minimum_size = Vector2(300, 300)
 	col.add_child(board_view)
-	var tip := StudioUI.label(host.tip_for(level, mode), 26, Palette.TEXT_DIM)
-	col.add_child(tip)
+	_tip = StudioUI.label("", 26, Palette.TEXT_DIM)
+	_tip.custom_minimum_size.y = 72
+	col.add_child(_tip)
 	var bottom := StudioUI.hbox(16)
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(bottom)
@@ -133,6 +135,7 @@ func _apply_hint() -> void:
 
 func _update_labels() -> void:
 	_moves_label.text = "Moves %d" % session.moves
+	_tip.text = host.tip_for(level, mode, session)
 	_undo_button.disabled = not session.can_undo()
 	_hint_button.text = "Hint (%d)" % host.hints_available()
 	_update_timer()
@@ -206,10 +209,23 @@ func _pause() -> void:
 	v.add_child(StudioUI.button("Quit to menu", _quit))
 
 
+## Android back button: open/close the pause menu instead of leaving mid-puzzle.
+func handle_back() -> bool:
+	if session.is_solved:
+		return false
+	if _overlay != null:
+		_close_overlay()
+		_paused = false
+	else:
+		_pause()
+	return true
+
+
 func _quit() -> void:
 	if not session.is_solved:
 		host.track("level_failed", {"level": level.id, "mode": mode, "reason": "quit", "moves": session.moves})
 	exited.emit()
+	set_process(false)
 	host.go_back_from_game(mode)
 
 
