@@ -1,0 +1,27 @@
+# Godot
+.godot/
+*.import.tmp
+export_credentials.cfg
+.android/
+games/*/android/build/
+
+# Build outputs
+build/
+*.apk
+*.aab
+*.idsig
+
+# Secrets: never commit signing material or keys
+*.keystore
+*.jks
+*.p12
+*.pem
+signing.env
+secrets/
+.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.tmp
+__pycache__/
