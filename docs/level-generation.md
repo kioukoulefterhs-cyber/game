@@ -1,0 +1,62 @@
+# Level generation and validation
+
+## Pipeline (`CGGenerator`, `games/circuit-garden/scripts/puzzle/generator.gd`)
+
+1. **Seeded RNG.** `RandomNumberGenerator` (PCG32) seeded with the level seed. The global RNG
+   and `Array.shuffle()` are never used, so a seed reproduces the same level everywhere.
+2. **Blocked cells** are placed at random while the open cells stay connected.
+3. **Cross cells** are interior cells whose four neighbours are open.
+4. **Sources** (one per color) are placed away from crosses and from each other.
+5. **Carve a solved board.** Randomized Kruskal over (cell, channel) nodes builds a spanning
+   forest with one tree per source. Constraints: a source has degree 1, a normal cell has at
+   most degree 3 (a tee), cross channels always pass straight through, and two trees that
+   both hold a source are never merged. A carve where any node is left without a source
+   is rejected and the next attempt draws from the same RNG stream.
+6. **Tiles from degrees.** Degree 1 becomes a receiver (share set by `receiver_ratio`, at least
+   one per color) or a cap, degree 2 a straight or elbow, degree 3 a tee.
+7. **Scramble** every rotatable tile to a random rotation.
+8. **Uniqueness.** `CGSolver` searches all rotations (row-major backtracking with
+   neighbour-consistency pruning). While it finds two solutions, the generator pins a tile
+   where they differ to its intended rotation. In practice the rules (no leaks, exactly one
+   source per network) are strong enough that the 100 launch levels needed no pins.
+9. **Rejection rules** (the attempt is discarded):
+   * start already solved, or `min_moves < max(3, free_tiles * min_scramble)`;
+   * share of tiles fixed by local constraints alone `>= max_forced_ratio` (too trivial);
+   * solver node limit reached (uniqueness unproven).
+
+## Acceptance criterion (what "valid level" means)
+
+A level ships only if **both** independent solvers prove it has **exactly one solution** under
+mask equivalence (docs/puzzle-rules.md), the stored solution is that solution, the start is not
+solved, `min_moves` and `par` recompute exactly, and each color has one source and at least one
+receiver. We do not claim more than this: uniqueness is proven per level by exhaustive search,
+not guaranteed by construction.
+
+## Difficulty
+
+`difficulty.score = free_tiles + 0.5*min_moves + 2*ln(1+search_nodes) + 4*(colors-1) + 3*crosses - 0.75*forced_tiles`.
+It is a heuristic used to order levels inside a band, not a measured player difficulty. Both
+solvers currently need no guessing on any launch level (the validator's most-constrained-cell
+search visits one node per cell), so every level can be solved by deduction alone. Real
+difficulty tuning needs playtest data, which we do not have yet.
+
+## Campaign
+
+`games/circuit-garden/puzzles/curriculum.json` defines bands (Sprout 4x4 through Wildwood 7x7
+with four colors). Each band generates 3x candidates from consecutive seeds, sorts by score and
+picks evenly spaced ones. Regenerate and validate:
+
+```
+tools/level-generator/generate.sh            # Linux/macOS
+.\tools\level-generator\generate.ps1 -Godot <path to Godot console exe>   # Windows
+```
+
+Regeneration is byte-identical for the same curriculum and engine version.
+
+## Independent validator
+
+`tools/level-validator/validate.py` re-implements the rules in Python with a different search
+(most-constrained cell first, edge-state propagation). It checks schema, solution, uniqueness,
+triviality, `min_moves`/`par`, colors, duplicate ids and puzzles, and campaign size order.
+Its own tests (`python3 -m unittest tools/level-validator/test_validate.py`) include a
+brute-force cross-check on every level with 8 or fewer free tiles.
