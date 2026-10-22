@@ -128,10 +128,12 @@ func _on_product_details(r: Dictionary) -> void:
 		return
 	var out: Array = []
 	for d in r.get("product_details", []):
-		var price := ""
+		# Field names follow the Billing Library's ProductDetails; verify on a device with a real
+		# Play Console product before showing prices (fallbacks keep the store usable meanwhile).
+		var price := str(d.get("formatted_price", d.get("price", "")))
 		var offer = d.get("one_time_purchase_offer_details", {})
-		if typeof(offer) == TYPE_DICTIONARY:
-			price = str(offer.get("formatted_price", ""))
+		if typeof(offer) == TYPE_DICTIONARY and offer.has("formatted_price"):
+			price = str(offer.formatted_price)
 		out.append({"id": str(d.get("product_id", "")), "title": str(d.get("name", d.get("title", ""))), "price": price})
 	products_received.emit(out)
 

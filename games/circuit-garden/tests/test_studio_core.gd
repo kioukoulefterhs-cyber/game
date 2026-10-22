@@ -268,6 +268,24 @@ func test_billing_failed_consume_is_retried() -> void:
 	r[0].free()
 
 
+func test_admob_adapter_without_plugin_gives_no_ads() -> void:
+	var a := StudioAdMobAdapter.new()
+	var fails := []
+	a.rewarded_failed.connect(func(r): fails.append(r))
+	a.initialize({"live_enabled": false})
+	a.load_rewarded()
+	t.eq(fails.size(), 1, "load fails cleanly without the plugin")
+	t.eq(a.consent_state(), StudioConsent.State.UNKNOWN)
+	t.check(not StudioAdMobAdapter.plugin_available())
+	var ads := StudioAds.new()
+	ads.configure(StudioAdMobAdapter.new())
+	var got := []
+	ads.rewarded_result.connect(func(ok, _r): got.append(ok))
+	ads.show_rewarded()
+	t.eq(got, [false], "no reward without an ad")
+	ads.free()
+
+
 func test_play_billing_adapter_without_plugin_is_unavailable() -> void:
 	var a := StudioPlayBillingAdapter.new()
 	var got := []

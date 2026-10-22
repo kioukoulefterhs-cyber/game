@@ -25,6 +25,11 @@ func _ready() -> void:
 	consent.button_pressed = Game.settings.get_value("analytics_consent") == "granted"
 	consent.toggled.connect(func(on): Game.settings.set_value("analytics_consent", "granted" if on else "denied"))
 	list.add_child(consent)
+	if Game.ads.adapter is StudioAdMobAdapter:
+		# Required wherever Google's consent form applies (EEA, UK, Switzerland).
+		list.add_child(StudioUI.button("Ad privacy choices", func():
+			if not Game.ads.adapter.show_privacy_options():
+				host.toast("Ads are not available")))
 	list.add_child(StudioUI.button("Privacy policy and support", func(): host.show_screen("about")))
 	list.add_child(StudioUI.label("Purchases", 30, Palette.ACCENT, HORIZONTAL_ALIGNMENT_LEFT))
 	list.add_child(StudioUI.button("Restore purchases", func():
