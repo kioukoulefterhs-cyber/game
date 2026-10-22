@@ -3,11 +3,15 @@ extends Control
 
 const Palette := preload("res://scripts/ui/palette.gd")
 var _t := 0.0
+var _last_draw := -1.0
 
 
 func _process(delta: float) -> void:
 	_t += delta
-	queue_redraw()
+	# Ambient animation: 30 redraws a second is smooth enough and saves battery.
+	if _t - _last_draw >= 1.0 / 30.0:
+		_last_draw = _t
+		queue_redraw()
 
 
 func _draw() -> void:
