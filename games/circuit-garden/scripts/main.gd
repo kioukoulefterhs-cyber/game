@@ -70,6 +70,12 @@ func show_screen(name: String, data: Dictionary = {}, push := true) -> void:
 func go_back() -> void:
 	if _current and _current.has_method("handle_back") and _current.handle_back():
 		return
+	_pop_screen()
+
+
+## Leaves the current screen without asking it first. Explicit Quit/Menu buttons use this;
+## going through handle_back() would only close the game's pause overlay.
+func _pop_screen() -> void:
 	if _stack.size() <= 1:
 		get_tree().quit()
 		return
@@ -184,7 +190,7 @@ func next_level(lv: CGLevel, _mode: String) -> void:
 
 func go_back_from_game(_mode: String) -> void:
 	await _natural_break()
-	go_back()
+	_pop_screen()
 
 
 func open_settings_overlay(_from: Control) -> void:
