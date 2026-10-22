@@ -19,6 +19,7 @@ const SUPPORT_URL := "mailto:support@example.com" ## TODO: real address before r
 var _stack: Array = [] ## [name, data]
 var _current: Control
 var _toast: Label
+var _last_back_frame := -1
 
 
 func _ready() -> void:
@@ -41,11 +42,29 @@ func _ready() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
-		go_back()
+		_on_back_request()
 	elif what == NOTIFICATION_WM_CLOSE_REQUEST:
 		Game.analytics.end_session()
 		Game.save.save_now()
 		get_tree().quit()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_BACK:
+		get_viewport().set_input_as_handled()
+		_on_back_request()
+
+
+## Android may deliver one press both as a go-back request and as KEY_BACK; act once.
+func _on_back_request() -> void:
+	var frame := Engine.get_process_frames()
+	if frame == _last_back_frame:
+		return
+	_last_back_frame = frame
+	if OS.is_debug_build():
+		print("[nav] back pressed on %s" % (_stack.back()[0] if not _stack.is_empty() else "?"))
+	go_back()
 
 
 func show_screen(name: String, data: Dictionary = {}, push := true) -> void:
@@ -191,6 +210,11 @@ func next_level(lv: CGLevel, _mode: String) -> void:
 func go_back_from_game(_mode: String) -> void:
 	await _natural_break()
 	_pop_screen()
+
+
+func quit_game_to_menu(_mode: String) -> void:
+	await _natural_break()
+	show_screen("menu")
 
 
 func open_settings_overlay(_from: Control) -> void:

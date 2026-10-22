@@ -214,27 +214,39 @@ func _pause() -> void:
 		_paused = false))
 	v.add_child(StudioUI.button("Restart", _restart))
 	v.add_child(StudioUI.button("Settings", func(): host.open_settings_overlay(self)))
-	v.add_child(StudioUI.button("Quit to menu", _quit))
+	v.add_child(StudioUI.button("Quit to menu", _quit_to_menu))
 
 
-## Android back button: open/close the pause menu instead of leaving mid-puzzle.
+## Android back button: the first press pauses, a second press (pause or time-up panel
+## open) leaves the level. Other panels, such as the hint offer, just close.
 func handle_back() -> bool:
 	if session.is_solved:
 		return false
-	if _overlay != null:
-		_close_overlay()
-		_paused = false
-	else:
+	if _overlay == null:
 		_pause()
+	elif _paused or session.is_time_up():
+		_quit_to_menu()
+	else:
+		_close_overlay()
 	return true
 
 
+## Leaves to the previous screen (Levels or the menu).
 func _quit() -> void:
+	_leave()
+	host.go_back_from_game(mode)
+
+
+func _quit_to_menu() -> void:
+	_leave()
+	host.quit_game_to_menu(mode)
+
+
+func _leave() -> void:
 	if not session.is_solved:
 		host.track("level_failed", {"level": level.id, "mode": mode, "reason": "quit", "moves": session.moves})
 	exited.emit()
 	set_process(false)
-	host.go_back_from_game(mode)
 
 
 func _open_overlay() -> VBoxContainer:
