@@ -1,0 +1,13 @@
+{
+	"comment": "Monetization switches. See docs/monetization.md. Changing ads_mode to live or billing_enabled to true needs the owner's approval and a configured AdMob / Play Console account.",
+	"ads_mode": "off",
+	"billing_enabled": false,
+	"admob": {
+		"test_android_app_id": "ca-app-pub-3940256099942544~3347511713",
+		"test_rewarded_android": "ca-app-pub-3940256099942544/5224354917",
+		"test_interstitial_android": "ca-app-pub-3940256099942544/1033173712",
+		"android_app_id": "",
+		"rewarded_android": "",
+		"interstitial_android": ""
+	}
+}

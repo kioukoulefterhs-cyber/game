@@ -8,6 +8,7 @@ signal hints_changed(total: int)
 signal entitlements_changed
 
 const LEVEL_PACK := "res://puzzles/levels_v1.json"
+const MONETIZATION_CONFIG := "res://config/monetization.json"
 const STARTING_HINTS := 3
 const HINT_PACK_SIZE := 10
 const SEEDS_FIRST_CLEAR := 5 ## daily puzzles and levels without a difficulty label
@@ -38,6 +39,7 @@ var billing := StudioBilling.new()
 var debug_log := StudioDebugLogAdapter.new()
 
 var levels: Array[CGLevel] = []
+var monetization := {}
 var _configured := false
 
 
@@ -72,17 +74,26 @@ func configure(save_path := "user://cg_save.json", settings_path := "user://sett
 	billing.granted.connect(_on_purchase_granted)
 	billing.entitlements_changed.connect(_on_entitlements_changed)
 	var debug := OS.is_debug_build()
+	monetization = load_monetization()
 	if billing_adapter == null:
-		billing_adapter = _mock_billing() if debug else StudioPlayBillingAdapter.new()
+		if monetization.billing_enabled:
+			billing_adapter = StudioPlayBillingAdapter.new()
+		else:
+			# Debug builds use the pretend store; release builds have no store until enabled.
+			billing_adapter = _mock_billing() if debug else StudioBillingAdapter.new()
 	billing.configure(billing_adapter, {
 		PRODUCT_REMOVE_ADS: StudioBilling.Kind.NON_CONSUMABLE,
 		PRODUCT_GARDEN_PACK: StudioBilling.Kind.NON_CONSUMABLE,
 		PRODUCT_HINT_PACK: StudioBilling.Kind.CONSUMABLE,
 	})
 	if ads_adapter == null:
-		ads_adapter = StudioMockAdsAdapter.new() if debug else StudioAdMobAdapter.new()
+		match monetization.ads_mode:
+			"test", "live":
+				ads_adapter = StudioAdMobAdapter.new()
+			_:
+				ads_adapter = StudioMockAdsAdapter.new() if debug else StudioAdsAdapter.new()
 	ads.ads_removed = billing.is_owned(PRODUCT_REMOVE_ADS)
-	ads.configure(ads_adapter, {"live_enabled": false})
+	ads.configure(ads_adapter, admob_config())
 	if not prog.first_launch_done:
 		prog.first_launch_done = true
 		analytics.track("first_launch")
@@ -91,8 +102,37 @@ func configure(save_path := "user://cg_save.json", settings_path := "user://sett
 	save.save_now()
 
 
+## Reads config/monetization.json. Anything missing or unreadable means "off".
+static func load_monetization(path := MONETIZATION_CONFIG) -> Dictionary:
+	var out := {"ads_mode": "off", "billing_enabled": false, "admob": {}}
+	if FileAccess.file_exists(path):
+		var d = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if typeof(d) == TYPE_DICTIONARY:
+			out.ads_mode = str(d.get("ads_mode", "off"))
+			out.billing_enabled = d.get("billing_enabled", false) == true
+			out.admob = d.get("admob", {})
+	if not out.ads_mode in ["off", "test", "live"]:
+		out.ads_mode = "off"
+	return out
+
+
+## Settings for StudioAdMobAdapter. Live ids are used only in live mode and only when all set;
+## otherwise Google's public test ids, which never pay out and are safe on any device.
+func admob_config() -> Dictionary:
+	var a: Dictionary = monetization.get("admob", {})
+	var live: bool = monetization.get("ads_mode") == "live" and str(a.get("rewarded_android", "")) != "" \
+		and str(a.get("android_app_id", "")) != ""
+	return {
+		"live_enabled": live,
+		"rewarded_unit": str(a.get("rewarded_android" if live else "test_rewarded_android", "")),
+		"interstitial_unit": str(a.get("interstitial_android" if live else "test_interstitial_android", "")),
+		"under_age_of_consent": false,
+	}
+
+
 func _mock_billing() -> StudioMockBillingAdapter:
 	var m := StudioMockBillingAdapter.new()
+	m.owned = save.section("mock_store").get("owned", []).duplicate(true)
 	m.catalog = [
 		{"id": PRODUCT_REMOVE_ADS, "title": "Remove ads", "price": "TEST"},
 		{"id": PRODUCT_GARDEN_PACK, "title": "Aurora garden pack", "price": "TEST"},
@@ -354,21 +394,25 @@ func _on_purchase_granted(id: String, _purchase: Dictionary) -> void:
 				if not p.id in garden().owned:
 					garden().owned.append(p.id)
 	analytics.track("purchase_completed", {"product": id})
-	_persist_billing()
+	_persist_billing.call_deferred() # after the consume/acknowledge that follows the grant
 
 
 func _on_entitlements_changed() -> void:
 	ads.ads_removed = billing.is_owned(PRODUCT_REMOVE_ADS)
-	if billing.is_owned(PRODUCT_GARDEN_PACK):
-		for p in CGGarden.PACK_PLANTS:
-			if not p.id in garden().owned:
-				garden().owned.append(p.id)
+	for p in CGGarden.PACK_PLANTS:
+		if billing.is_owned(PRODUCT_GARDEN_PACK) and not p.id in garden().owned:
+			garden().owned.append(p.id)
+		elif not billing.is_owned(PRODUCT_GARDEN_PACK) and p.id in garden().owned:
+			garden().owned.erase(p.id) # refunded or revoked by the store
 	_persist_billing()
 	entitlements_changed.emit()
 
 
 func _persist_billing() -> void:
 	save.set_value("billing", billing.export_state())
+	if billing.adapter is StudioMockBillingAdapter:
+		# The pretend store remembers purchases across launches, like a real store account.
+		save.set_value("mock_store", {"owned": billing.adapter.owned})
 	save.save_now()
 
 

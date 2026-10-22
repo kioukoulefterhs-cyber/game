@@ -235,6 +235,48 @@ func test_billing_restore_after_reinstall() -> void:
 	fresh2.free()
 
 
+func test_billing_refund_revokes_entitlement() -> void:
+	var r := _billing()
+	var revoked := []
+	r[0].revoked.connect(func(id): revoked.append(id))
+	r[0].buy("remove_ads")
+	r[1].refund("mock-token-1")
+	r[0].restore_purchases()
+	t.check(not r[0].is_owned("remove_ads"), "refunded entitlement removed on restore")
+	t.eq(revoked, ["remove_ads"])
+	r[0].free()
+
+
+func test_billing_offline_restore_keeps_entitlements() -> void:
+	var r := _billing()
+	r[0].buy("remove_ads")
+	r[1].outcome = "offline"
+	r[0].restore_purchases()
+	t.check(r[0].is_owned("remove_ads"), "no answer from the store is not a refund")
+	r[0].free()
+
+
+func test_billing_failed_consume_is_retried() -> void:
+	var r := _billing()
+	r[0].buy("hints")
+	var token: String = r[1].consumes[0]
+	# Pretend the consume never reached the store: it still lists the purchase.
+	r[1].owned.append({"product_id": "hints", "token": token, "state": "purchased", "acknowledged": false})
+	r[0].restore_purchases()
+	t.eq(r[2].size(), 1, "not granted twice")
+	t.eq(r[1].consumes.size(), 2, "consume retried")
+	r[0].free()
+
+
+func test_play_billing_adapter_without_plugin_is_unavailable() -> void:
+	var a := StudioPlayBillingAdapter.new()
+	var got := []
+	a.connected.connect(func(ok): got.append(ok))
+	a.start_connection()
+	t.eq(got, [false])
+	t.check(not StudioPlayBillingAdapter.plugin_available())
+
+
 func test_verifier_rejects_unknown_and_reports_insecure() -> void:
 	var v := StudioPurchaseVerifier.new()
 	v.known_products = PackedStringArray(["remove_ads"])

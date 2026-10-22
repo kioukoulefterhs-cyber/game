@@ -5,7 +5,7 @@ var t
 const DIR := "user://test_game"
 
 
-func _game(fresh := true, ads_outcome := "complete", billing_outcome := "success") -> CGGame:
+func _game(fresh := true, ads_outcome := "complete", billing_outcome := "success", store_owned: Array = []) -> CGGame:
 	DirAccess.make_dir_recursive_absolute(DIR)
 	if fresh:
 		for f in DirAccess.get_files_at(DIR):
@@ -14,6 +14,7 @@ func _game(fresh := true, ads_outcome := "complete", billing_outcome := "success
 	ads.outcome = ads_outcome
 	var bill := StudioMockBillingAdapter.new()
 	bill.outcome = billing_outcome
+	bill.owned = store_owned.duplicate(true) # what the player's store account already owns
 	var g := CGGame.new()
 	t.root.add_child(g)
 	g.configure(DIR.path_join("save.json"), DIR.path_join("settings.cfg"), ads, bill)
@@ -166,11 +167,28 @@ func test_purchases_apply_entitlements() -> void:
 	t.check(g.ads.ads_removed)
 	g.buy_product(CGGame.PRODUCT_GARDEN_PACK)
 	t.check(g.owns_item("aurora"))
+	var account: Array = g.billing.adapter.owned
 	_done(g)
-	var again := _game(false)
-	t.check(again.billing.is_owned(CGGame.PRODUCT_REMOVE_ADS), "entitlement persists locally")
+	var again := _game(false, "complete", "success", account)
+	t.check(again.billing.is_owned(CGGame.PRODUCT_REMOVE_ADS), "entitlement persists across launches")
 	t.check(again.ads.ads_removed)
 	_done(again)
+	var offline := _game(false, "complete", "offline")
+	t.check(offline.billing.is_owned(CGGame.PRODUCT_REMOVE_ADS), "kept when the store cannot be reached")
+	_done(offline)
+
+
+func test_refund_removes_paid_items() -> void:
+	var g := _game()
+	g.buy_product(CGGame.PRODUCT_GARDEN_PACK)
+	g.buy_product(CGGame.PRODUCT_REMOVE_ADS)
+	var store: StudioMockBillingAdapter = g.billing.adapter
+	for p in store.owned.duplicate():
+		store.refund(p.token)
+	g.billing.restore_purchases()
+	t.check(not g.owns_item("aurora"), "pack plants removed after a refund")
+	t.check(not g.ads.ads_removed, "ads return after remove-ads is refunded")
+	_done(g)
 
 
 func test_offline_play_is_fully_functional() -> void:
@@ -193,4 +211,24 @@ func test_analytics_events_recorded_with_consent() -> void:
 	g.settings.set_value("analytics_consent", "denied")
 	_solve(g, 1)
 	t.eq(g.debug_log.count("level_complete"), 1, "nothing recorded after opting out")
+	_done(g)
+
+
+func test_shipped_monetization_config_is_off() -> void:
+	# Release gate: real ads and real purchases stay off until the owner approves turning them on.
+	var m := CGGame.load_monetization()
+	t.eq(m.ads_mode, "off", "ads_mode in config/monetization.json")
+	t.eq(m.billing_enabled, false, "billing_enabled in config/monetization.json")
+
+
+func test_monetization_config_falls_back_to_off() -> void:
+	var m := CGGame.load_monetization("res://does/not/exist.json")
+	t.eq(m.ads_mode, "off")
+	t.eq(m.billing_enabled, false)
+	var g := _game()
+	g.monetization = {"ads_mode": "live", "admob": {"rewarded_android": "", "android_app_id": "",
+		"test_rewarded_android": "ca-app-pub-3940256099942544/5224354917"}}
+	var c := g.admob_config()
+	t.eq(c.live_enabled, false, "live mode without live ids stays on test ids")
+	t.eq(c.rewarded_unit, "ca-app-pub-3940256099942544/5224354917")
 	_done(g)

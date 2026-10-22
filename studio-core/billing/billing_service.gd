@@ -2,13 +2,16 @@ class_name StudioBilling
 extends Node
 ## Purchase flow on top of a store adapter:
 ## pending purchases are never granted; each token is granted at most once; non-consumables
-## are acknowledged and consumables consumed only after granting; restore rebuilds
-## permanent entitlements from the store's purchase list.
+## are acknowledged and consumables consumed only after granting; a failed acknowledge or
+## consume is retried on the next restore (Play refunds purchases left unacknowledged for
+## three days); restore rebuilds permanent entitlements from the store's purchase list and
+## removes ones the store no longer reports (refunds, chargebacks).
 
 signal granted(product_id: String, purchase: Dictionary)
 signal pending(product_id: String)
 signal failed(product_id: String, reason: String)
 signal entitlements_changed
+signal revoked(product_id: String)
 
 enum Kind { CONSUMABLE, NON_CONSUMABLE }
 
@@ -30,6 +33,7 @@ func configure(p_adapter: StudioBillingAdapter, catalog: Dictionary) -> void:
 		for p in list:
 			store_products[p.id] = p)
 	adapter.purchases_updated.connect(_on_purchases)
+	adapter.purchases_restored.connect(_on_restored)
 	adapter.purchase_failed.connect(func(id, reason): failed.emit(id, reason))
 	adapter.start_connection()
 
@@ -79,6 +83,19 @@ func _on_purchases(list: Array) -> void:
 		_handle_purchase(p)
 
 
+func _on_restored(list: Array) -> void:
+	var still_owned := {}
+	for p in list:
+		if p.get("state") == "purchased":
+			still_owned[p.get("product_id", "")] = true
+		_handle_purchase(p)
+	for id in owned.keys():
+		if not still_owned.has(id):
+			owned.erase(id)
+			revoked.emit(id)
+			entitlements_changed.emit()
+
+
 func _handle_purchase(p: Dictionary) -> void:
 	var id: String = p.get("product_id", "")
 	if not products.has(id):
@@ -96,6 +113,8 @@ func _handle_purchase(p: Dictionary) -> void:
 				entitlements_changed.emit()
 			if not p.get("acknowledged", false):
 				adapter.acknowledge(token)
+		else:
+			adapter.consume(token) # still in the store's list, so the last consume failed
 		return
 	var check := verifier.verify(p)
 	if not check.ok:

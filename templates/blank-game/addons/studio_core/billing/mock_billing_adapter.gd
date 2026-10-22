@@ -59,7 +59,14 @@ func redeliver(token: String) -> void:
 
 
 func query_purchases() -> void:
-	purchases_updated.emit(owned.map(func(p): return p.duplicate()))
+	if outcome == "offline":
+		return
+	purchases_restored.emit(owned.map(func(p): return p.duplicate()))
+
+
+## Simulates a refund or chargeback: the store forgets the purchase.
+func refund(token: String) -> void:
+	owned = owned.filter(func(p): return p.token != token)
 
 
 func acknowledge(token: String) -> void:
