@@ -1,0 +1,87 @@
+{
+  "format": "circuit-garden-curriculum",
+  "version": 1,
+  "comment": "Bands of the launch campaign. Each band generates candidates * count levels from consecutive seeds, keeps those inside the score window, and picks evenly spaced scores so difficulty rises inside the band.",
+  "base_seed": 20261021,
+  "candidates": 3,
+  "bands": [
+    {
+      "name": "Sprout",
+      "count": 5,
+      "params": {
+        "size": 4,
+        "colors": 1,
+        "blocked": 5,
+        "receiver_ratio": 1.0,
+        "min_scramble": 0.5
+      }
+    },
+    {
+      "name": "Seedling",
+      "count": 10,
+      "params": {
+        "size": 4,
+        "colors": 1,
+        "blocked": 2,
+        "receiver_ratio": 0.7
+      }
+    },
+    {
+      "name": "Two Colors",
+      "count": 10,
+      "params": {
+        "size": 5,
+        "colors": 2,
+        "blocked": 3,
+        "receiver_ratio": 0.7
+      }
+    },
+    {
+      "name": "Bridges",
+      "count": 15,
+      "params": {
+        "size": 5,
+        "colors": 2,
+        "blocked": 1,
+        "crosses": 1,
+        "receiver_ratio": 0.6
+      }
+    },
+    {
+      "name": "Meadow",
+      "count": 20,
+      "params": {
+        "size": 6,
+        "colors": 2,
+        "blocked": 2,
+        "crosses": 1,
+        "receiver_ratio": 0.45,
+        "max_forced_ratio": 0.8
+      }
+    },
+    {
+      "name": "Grove",
+      "count": 20,
+      "params": {
+        "size": 7,
+        "colors": 3,
+        "blocked": 2,
+        "crosses": 2,
+        "receiver_ratio": 0.35,
+        "max_forced_ratio": 0.72
+      }
+    },
+    {
+      "name": "Wildwood",
+      "count": 20,
+      "params": {
+        "size": 7,
+        "colors": 4,
+        "blocked": 1,
+        "crosses": 3,
+        "receiver_ratio": 0.25,
+        "max_forced_ratio": 0.65
+      }
+    }
+  ]
+}

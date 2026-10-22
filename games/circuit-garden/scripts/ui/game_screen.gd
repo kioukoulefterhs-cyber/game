@@ -69,6 +69,7 @@ func _ready() -> void:
 	bottom.add_child(_hint_button)
 	board_view.bind(session)
 	board_view.cell_tapped.connect(_on_cell_tapped)
+	board_view.flower_lit.connect(func(_i, color): if not session.is_solved: host.play_sfx("bloom%d" % (color % 4)))
 	session.changed.connect(_update_labels)
 	session.solved.connect(_on_solved)
 	_update_labels()
@@ -181,7 +182,14 @@ func _show_time_up() -> void:
 func _show_hint_offer() -> void:
 	var v := _open_overlay()
 	v.add_child(StudioUI.label("Out of hints", 40))
-	v.add_child(StudioUI.label("Hints are optional. You can earn one by watching a short ad, or get a hint pack in the store.", 26, Palette.TEXT_DIM))
+	v.add_child(StudioUI.label("Hints are optional. Trade %d seeds for one, watch a short ad, or get a hint pack in the store." % Game.HINT_SEED_COST, 26, Palette.TEXT_DIM))
+	var trade := StudioUI.button("Use %d seeds (you have %d)" % [Game.HINT_SEED_COST, Game.seeds()], func():
+		_close_overlay()
+		if Game.buy_hint_with_seeds():
+			_apply_hint()
+		_update_labels())
+	trade.disabled = Game.seeds() < Game.HINT_SEED_COST
+	v.add_child(trade)
 	var ad := StudioUI.button("Watch ad for 1 hint", func():
 		_close_overlay()
 		host.offer_rewarded_hint(func(granted: bool):

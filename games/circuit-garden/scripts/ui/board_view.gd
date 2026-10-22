@@ -4,6 +4,10 @@ extends Control
 ## Emits cell_tapped; it never changes the session itself.
 
 signal cell_tapped(index: int)
+signal flower_lit(index: int, color: int)
+
+const TURN_TIME := 0.17 ## seconds per quarter turn
+const BLOOM_TIME := 0.45
 
 const Palette := preload("res://scripts/ui/palette.gd")
 
@@ -16,14 +20,24 @@ var _time := 0.0
 var _win_t := -1.0
 var _pop := {} ## cell -> time of last tap, for a squash animation
 var _hint_flash := {}
+var _turn_from := PackedFloat32Array() ## Displayed angle when the current turn started.
+var _turn_t0 := PackedFloat32Array() ## Start time of the current turn, -1 when settled.
+var _bloom_t := {} ## flower cell -> time it lit up
+var _lit := {} ## flower cells currently powered
+var _animating := true
 
 
 func bind(s: CGSession) -> void:
 	session = s
 	_angle.resize(s.board.cell_count())
+	_turn_from.resize(s.board.cell_count())
+	_turn_t0.resize(s.board.cell_count())
 	for i in s.board.cell_count():
 		_angle[i] = s.board.rot[i]
+		_turn_t0[i] = -1.0
 	_win_t = -1.0
+	_bloom_t.clear()
+	_lit = _lit_flowers()
 	if not s.changed.is_connected(_on_changed):
 		s.changed.connect(_on_changed)
 		s.solved.connect(_on_solved)
@@ -42,10 +56,43 @@ func _on_changed() -> void:
 	for i in session.board.cell_count():
 		var target := float(session.board.rot[i])
 		var delta := fposmod(target - _angle[i], 4.0)
+		if absf(delta) < 0.001 or absf(delta - 4.0) < 0.001:
+			continue
 		if delta > 1.01 and delta < 2.99:
 			_angle[i] = target
+			_turn_t0[i] = -1.0
+		else:
+			_turn_from[i] = _angle[i]
+			_turn_t0[i] = _time
 	_dist = session.board.flow_distances(session.analysis)
+	var now := _lit_flowers()
+	for i in now:
+		if not _lit.has(i):
+			_bloom_t[i] = _time
+			flower_lit.emit(i, session.board.colors[i])
+	for i in _lit:
+		if not now.has(i):
+			_bloom_t.erase(i)
+	_lit = now
+	_animating = true
 	queue_redraw()
+
+
+func _lit_flowers() -> Dictionary:
+	var out := {}
+	var b := session.board
+	for i in b.cell_count():
+		if b.types[i] == CGBoard.Tile.RECEIVER:
+			var net_id: int = session.analysis.node_net.get(i * 2, -1)
+			if net_id >= 0 and session.analysis.networks[net_id].color == b.colors[i]:
+				out[i] = true
+	return out
+
+
+## Ease-out with a small overshoot, so turns and blooms settle with a little spring.
+static func ease_out_back(k: float) -> float:
+	k = clampf(k, 0.0, 1.0) - 1.0
+	return 1.0 + k * k * (2.2 * k + 1.2)
 
 
 func _on_solved() -> void:
@@ -60,17 +107,35 @@ func _process(delta: float) -> void:
 	_time += delta
 	if session == null:
 		return
-	var speed := 14.0 if not reduce_motion else 100.0
+	var turning := false
 	for i in _angle.size():
+		if _turn_t0[i] < 0.0:
+			continue
 		var target := float(session.board.rot[i])
-		var diff := fposmod(target - _angle[i], 4.0)
+		var diff := fposmod(target - _turn_from[i], 4.0)
 		if diff > 2.0:
 			diff -= 4.0
-		if absf(diff) > 0.001:
-			_angle[i] += diff * minf(1.0, delta * speed)
-			if absf(fposmod(target - _angle[i] + 2.0, 4.0) - 2.0) < 0.01:
-				_angle[i] = target
-	queue_redraw()
+		var k := 1.0 if reduce_motion else (_time - _turn_t0[i]) / TURN_TIME
+		if k >= 1.0:
+			_angle[i] = target
+			_turn_t0[i] = -1.0
+		else:
+			_angle[i] = _turn_from[i] + diff * ease_out_back(k)
+			turning = true
+	# Redraw only while something moves: flowing energy, turns, pops, blooms, the win burst.
+	var busy := turning or (not _dist.is_empty() and not reduce_motion) \
+		or (_win_t >= 0.0 and _time - _win_t < 2.4) or _recent(_pop, 0.2) \
+		or _recent(_bloom_t, BLOOM_TIME + 0.4) or _recent(_hint_flash, 1.2)
+	if busy or _animating:
+		_animating = busy
+		queue_redraw()
+
+
+func _recent(times: Dictionary, window: float) -> bool:
+	for k in times:
+		if _time - float(times[k]) < window:
+			return true
+	return false
 
 
 func board_rect() -> Rect2:
@@ -186,9 +251,13 @@ func _draw_cell(i: int, cs: float, win_k: float) -> void:
 		# Vertical channel under, horizontal channel over with a bridge outline.
 		var cv := _arm_color(i, CGBoard.N)
 		var ch := _arm_color(i, CGBoard.E)
+		if cv != Palette.VINE_OFF:
+			draw_line(Vector2(0, -half), Vector2(0, half), Color(cv, 0.22), width * 2.2)
 		draw_line(Vector2(0, -half), Vector2(0, half), cv, width)
 		_draw_flow_segment(i, 0, Vector2(0, -half), Vector2(0, half), cv, width)
 		draw_line(Vector2(-half, 0), Vector2(half, 0), Palette.TILE, width * 1.9)
+		if ch != Palette.VINE_OFF:
+			draw_line(Vector2(-half, 0), Vector2(half, 0), Color(ch, 0.22), width * 2.2)
 		draw_line(Vector2(-half, 0), Vector2(half, 0), ch, width)
 		_draw_flow_segment(i, 1, Vector2(-half, 0), Vector2(half, 0), ch, width)
 	else:
@@ -197,6 +266,8 @@ func _draw_cell(i: int, cs: float, win_k: float) -> void:
 			var col := _arm_color(i, world)
 			var dir_v := _dir_vec(d).rotated(ang)
 			var end := dir_v * half
+			if col != Palette.VINE_OFF:
+				draw_line(Vector2.ZERO, end, Color(col, 0.22), width * 2.2)
 			draw_line(Vector2.ZERO, end, col, width)
 			draw_circle(Vector2.ZERO, width * 0.5, col)
 			_draw_flow_segment(i, 0, Vector2.ZERO, end, col, width)
@@ -226,7 +297,9 @@ func _draw_flow_segment(i: int, ch: int, from: Vector2, to: Vector2, col: Color,
 	var phase := fposmod(_time * 1.6 - float(_dist[key]) * 0.5, 1.0)
 	for k in 2:
 		var f := fposmod(phase + k * 0.5, 1.0)
-		draw_circle(from.lerp(to, f), width * 0.32, col.lightened(0.6))
+		var p := from.lerp(to, f)
+		draw_circle(p, width * 0.55, Color(col.lightened(0.5), 0.35))
+		draw_circle(p, width * 0.28, col.lightened(0.8))
 
 
 func _draw_flower(i: int, cs: float) -> void:
@@ -236,6 +309,13 @@ func _draw_flower(i: int, cs: float) -> void:
 	var lit: bool = net_id >= 0 and session.analysis.networks[net_id].color == b.colors[i]
 	var petals := 6
 	var open_k := 1.0 if lit else 0.35
+	if lit and _bloom_t.has(i) and not reduce_motion:
+		var k: float = (_time - _bloom_t[i]) / BLOOM_TIME
+		open_k = 0.35 + 0.65 * ease_out_back(k)
+		if k < 1.6:
+			# A ring of light spreads out as the flower opens.
+			var ring_k := clampf(k / 1.6, 0.0, 1.0)
+			draw_arc(Vector2.ZERO, cs * (0.2 + 0.35 * ring_k), 0.0, TAU, 32, Color(col, 0.6 * (1.0 - ring_k)), cs * 0.04)
 	for p in petals:
 		var a := TAU * p / petals + _time * (0.4 if lit and not reduce_motion else 0.0)
 		var pos := Vector2.from_angle(a) * cs * 0.16 * (0.6 + 0.4 * open_k)
@@ -263,6 +343,18 @@ func _draw_celebration(r: Rect2, cs: float) -> void:
 	if k > 2.2:
 		return
 	var center := r.get_center()
+	# Shock rings from every flower, then confetti from the centre.
+	var b := session.board
+	for i in b.cell_count():
+		if b.types[i] != CGBoard.Tile.RECEIVER:
+			continue
+		var rk := clampf(k / 1.2, 0.0, 1.0)
+		var rc := Palette.color(b.colors[i])
+		rc.a = 0.5 * (1.0 - rk)
+		draw_arc(cell_center(i), cs * (0.3 + 1.1 * rk), 0.0, TAU, 40, rc, cs * 0.05)
+	var glow := clampf(1.0 - k / 1.5, 0.0, 1.0)
+	if glow > 0.0:
+		draw_rect(r.grow(cs * 0.08), Color(Palette.ACCENT, 0.5 * glow), false, cs * 0.06)
 	for p in 28:
 		var a := TAU * p / 28.0 + p * 0.37
 		var dist := (0.2 + k * 0.9) * r.size.x * (0.35 + 0.15 * sin(p * 1.7))

@@ -61,6 +61,10 @@ func show_screen(name: String, data: Dictionary = {}, push := true) -> void:
 	_current = s
 	add_child(s)
 	move_child(s, 0)
+	if not setting("reduce_motion", false):
+		# Short fade so screens do not pop in.
+		s.modulate.a = 0.0
+		create_tween().tween_property(s, "modulate:a", 1.0, 0.18)
 
 
 func go_back() -> void:
@@ -116,7 +120,10 @@ func level_title(lv: CGLevel, mode: String) -> String:
 			return "Daily " + lv.id.trim_prefix("daily-")
 		"tutorial":
 			return "Tutorial"
-	return "Level %d" % (Game.level_index(lv) + 1)
+	var label: String = lv.difficulty.get("label", "")
+	if label.is_empty():
+		return "Level %d" % (Game.level_index(lv) + 1)
+	return "Level %d · %s" % [Game.level_index(lv) + 1, label]
 
 
 func tip_for(lv: CGLevel, mode: String, s: CGSession = null) -> String:

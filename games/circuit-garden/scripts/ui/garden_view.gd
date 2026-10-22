@@ -38,6 +38,10 @@ func _draw() -> void:
 		for i in 18:
 			var p := Vector2(fmod(i * 97.0, size.x), fmod(i * 53.0, horizon))
 			draw_circle(p, 1.5 + (i % 3), Color(1, 1, 1, 0.5 + 0.5 * sin(_t * 2.0 + i)))
+	elif theme_def.get("id", "") == "fireflies":
+		for i in 14:
+			var p := Vector2(fmod(i * 131.0 + 40.0 * sin(_t * 0.5 + i), size.x), fmod(i * 71.0, size.y * 0.9))
+			draw_circle(p, 3.0 + (i % 2), Color(0.95, 0.9, 0.4, 0.4 + 0.4 * sin(_t * 3.0 + i * 1.3)))
 	elif theme_def.get("id", "") == "greenhouse":
 		for i in 6:
 			var x := size.x * (i + 0.5) / 6.0

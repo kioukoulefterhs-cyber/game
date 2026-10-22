@@ -32,20 +32,29 @@ func test_campaign_covers_all_sizes_in_order() -> void:
 	t.eq(levels[99].size, 7)
 
 
-func test_regeneration_is_reproducible() -> void:
+func test_every_level_reproduces_from_its_seed() -> void:
 	var levels := CGLevel.load_pack(PACK)
-	for idx in [0, 37, 99]:
-		var lv: CGLevel = levels[idx]
-		var again := CGGenerator.new().generate(_params_for(lv), lv.level_seed)
+	for lv in levels:
+		var params: Dictionary = lv.difficulty.get("params", {})
+		t.check(not params.is_empty(), lv.id + " records its generator params")
+		var again := CGGenerator.new().generate(params, lv.level_seed)
 		t.check(again != null, lv.id)
 		if again:
 			t.eq(again.codes, lv.codes, lv.id + " tiles reproduce from seed")
 			t.eq(again.start, lv.start, lv.id + " scramble reproduces from seed")
 
 
-func _params_for(lv: CGLevel) -> Dictionary:
-	var cur = JSON.parse_string(FileAccess.get_file_as_string("res://puzzles/curriculum.json"))
-	for band in cur.bands:
-		if band.name == lv.difficulty.band:
-			return band.params
-	return {}
+func test_measured_difficulty_never_drops_and_is_labelled() -> void:
+	var levels := CGLevel.load_pack(PACK)
+	var prev := 0.0
+	var labels := {}
+	for lv in levels:
+		var effort := float(lv.difficulty.get("effort", -1.0))
+		t.check(effort >= prev, "%s effort %.0f >= previous %.0f" % [lv.id, effort, prev])
+		prev = effort
+		var label: String = lv.difficulty.get("label", "")
+		t.check(label in ["Easy", "Medium", "Hard", "Expert"], lv.id + " has a difficulty label")
+		labels[label] = true
+	t.eq(labels.size(), 4, "all four labels used")
+	t.eq(levels[0].difficulty.label, "Easy")
+	t.eq(levels[99].difficulty.label, "Expert")

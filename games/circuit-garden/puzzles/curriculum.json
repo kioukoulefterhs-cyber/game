@@ -1,87 +1,29 @@
 {
   "format": "circuit-garden-curriculum",
-  "version": 1,
-  "comment": "Bands of the launch campaign. Each band generates candidates * count levels from consecutive seeds, keeps those inside the score window, and picks evenly spaced scores so difficulty rises inside the band.",
-  "base_seed": 20261021,
-  "candidates": 3,
+  "version": 2,
+  "comment": "Launch campaign. Each band generates candidates from every variant (seeds start at seed_base + variant * 1000000), adds the band's v1 levels when keep_v1 is set, measures each candidate with tools/level-analyzer, and picks levels whose reasoning effort climbs evenly through effort[0]..effort[1] and never drops below the level before. See docs/level-generation.md.",
+  "candidates_per_variant": 1500,
   "bands": [
-    {
-      "name": "Sprout",
-      "count": 5,
-      "params": {
-        "size": 4,
-        "colors": 1,
-        "blocked": 5,
-        "receiver_ratio": 1.0,
-        "min_scramble": 0.5
-      }
-    },
-    {
-      "name": "Seedling",
-      "count": 10,
-      "params": {
-        "size": 4,
-        "colors": 1,
-        "blocked": 2,
-        "receiver_ratio": 0.7
-      }
-    },
-    {
-      "name": "Two Colors",
-      "count": 10,
-      "params": {
-        "size": 5,
-        "colors": 2,
-        "blocked": 3,
-        "receiver_ratio": 0.7
-      }
-    },
-    {
-      "name": "Bridges",
-      "count": 15,
-      "params": {
-        "size": 5,
-        "colors": 2,
-        "blocked": 1,
-        "crosses": 1,
-        "receiver_ratio": 0.6
-      }
-    },
-    {
-      "name": "Meadow",
-      "count": 20,
-      "params": {
-        "size": 6,
-        "colors": 2,
-        "blocked": 2,
-        "crosses": 1,
-        "receiver_ratio": 0.45,
-        "max_forced_ratio": 0.8
-      }
-    },
-    {
-      "name": "Grove",
-      "count": 20,
-      "params": {
-        "size": 7,
-        "colors": 3,
-        "blocked": 2,
-        "crosses": 2,
-        "receiver_ratio": 0.35,
-        "max_forced_ratio": 0.72
-      }
-    },
-    {
-      "name": "Wildwood",
-      "count": 20,
-      "params": {
-        "size": 7,
-        "colors": 4,
-        "blocked": 1,
-        "crosses": 3,
-        "receiver_ratio": 0.25,
-        "max_forced_ratio": 0.65
-      }
-    }
+    {"name": "Sprout", "count": 5, "effort": [6, 9], "keep_v1": true, "seed_base": 30000000,
+     "variants": [{"size": 4, "colors": 1, "blocked": 5, "receiver_ratio": 1.0, "min_scramble": 0.5}]},
+    {"name": "Seedling", "count": 10, "effort": [10, 18], "keep_v1": true, "seed_base": 31000000,
+     "variants": [{"size": 4, "colors": 1, "blocked": 2, "receiver_ratio": 0.7},
+                  {"size": 4, "colors": 1, "blocked": 1, "receiver_ratio": 0.3}]},
+    {"name": "Two Colors", "count": 10, "effort": [18, 28], "keep_v1": true, "seed_base": 32000000,
+     "variants": [{"size": 5, "colors": 2, "blocked": 3, "receiver_ratio": 0.7},
+                  {"size": 5, "colors": 2, "blocked": 1, "receiver_ratio": 0.2}]},
+    {"name": "Bridges", "count": 15, "effort": [28, 42], "keep_v1": true, "seed_base": 33000000,
+     "variants": [{"size": 5, "colors": 2, "blocked": 1, "crosses": 1, "receiver_ratio": 0.6},
+                  {"size": 5, "colors": 2, "blocked": 0, "crosses": 1, "receiver_ratio": 0.2}]},
+    {"name": "Meadow", "count": 20, "effort": [42, 60], "keep_v1": true, "seed_base": 34000000,
+     "variants": [{"size": 6, "colors": 2, "blocked": 2, "crosses": 1, "receiver_ratio": 0.45},
+                  {"size": 6, "colors": 2, "blocked": 1, "crosses": 1, "receiver_ratio": 0.15}]},
+    {"name": "Grove", "count": 20, "effort": [60, 78], "keep_v1": true, "seed_base": 35000000,
+     "variants": [{"size": 7, "colors": 3, "blocked": 0, "crosses": 2, "receiver_ratio": 0.1},
+                  {"size": 7, "colors": 3, "blocked": 1, "crosses": 2, "receiver_ratio": 0.2}]},
+    {"name": "Wildwood", "count": 20, "effort": [78, 100], "keep_v1": true, "seed_base": 36000000,
+     "candidates_per_variant": 5000,
+     "variants": [{"size": 7, "colors": 4, "blocked": 0, "crosses": 3, "receiver_ratio": 0.0},
+                  {"size": 7, "colors": 4, "blocked": 0, "crosses": 2, "receiver_ratio": 0.1}]}
   ]
 }

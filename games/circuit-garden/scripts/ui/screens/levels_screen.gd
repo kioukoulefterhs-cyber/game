@@ -12,7 +12,7 @@ func _ready() -> void:
 		var b_name: String = lv.difficulty.get("band", "")
 		if b_name != band:
 			band = b_name
-			list.add_child(StudioUI.label("%s  ·  %dx%d" % [band, lv.size, lv.size], 30, Palette.ACCENT, HORIZONTAL_ALIGNMENT_LEFT))
+			list.add_child(StudioUI.label("%s  ·  %dx%d  ·  %s" % [band, lv.size, lv.size, _label_range(i)], 30, Palette.ACCENT, HORIZONTAL_ALIGNMENT_LEFT))
 			grid = GridContainer.new()
 			grid.columns = 5
 			grid.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -33,3 +33,15 @@ func _ready() -> void:
 		b.add_theme_font_size_override("font_size", 26)
 		b.disabled = not unlocked
 		grid.add_child(b)
+
+
+## "Easy" or "Easy to Medium": the measured difficulty labels across the band starting at index.
+func _label_range(start: int) -> String:
+	var band: String = Game.levels[start].difficulty.get("band", "")
+	var first: String = Game.levels[start].difficulty.get("label", "")
+	var last := first
+	for k in range(start, Game.levels.size()):
+		if Game.levels[k].difficulty.get("band", "") != band:
+			break
+		last = Game.levels[k].difficulty.get("label", last)
+	return first if first == last else "%s to %s" % [first, last]

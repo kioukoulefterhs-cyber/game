@@ -10,7 +10,10 @@ signal entitlements_changed
 const LEVEL_PACK := "res://puzzles/levels_v1.json"
 const STARTING_HINTS := 3
 const HINT_PACK_SIZE := 10
-const SEEDS_FIRST_CLEAR := 5
+const SEEDS_FIRST_CLEAR := 5 ## daily puzzles and levels without a difficulty label
+## Harder levels pay more on first clear, so the Hard and Expert content stays rewarding.
+const SEEDS_FIRST_CLEAR_BY_LABEL := {"Easy": 5, "Medium": 7, "Hard": 9, "Expert": 12}
+const HINT_SEED_COST := 40 ## hints can always be earned with seeds, never only bought
 const SEEDS_PER_STAR := 5
 const SEEDS_DAILY := 20
 const UNLOCK_AHEAD := 3 ## levels playable beyond the furthest completed one
@@ -23,7 +26,7 @@ const EVENTS := [
 	"first_launch", "tutorial_start", "tutorial_complete", "level_start", "level_complete",
 	"level_failed", "session_start", "session_end", "hint_requested", "hint_used",
 	"rewarded_offered", "rewarded_completed", "purchase_initiated", "purchase_completed",
-	"garden_unlock", "daily_complete",
+	"garden_unlock", "daily_complete", "hint_bought_with_seeds",
 ]
 
 var save := StudioSave.new()
@@ -99,11 +102,15 @@ func _mock_billing() -> StudioMockBillingAdapter:
 
 
 func _register_sounds() -> void:
-	audio.register_tone("tap", [[660.0, 0.05]], 0.35)
-	audio.register_tone("blocked", [[180.0, 0.06]], 0.3)
-	audio.register_tone("hint", [[880.0, 0.06], [1320.0, 0.08]], 0.3, "soft")
-	audio.register_tone("win", [[523.25, 0.1], [659.25, 0.1], [783.99, 0.1], [1046.5, 0.25]], 0.35, "soft")
-	audio.register_tone("unlock", [[784.0, 0.08], [1175.0, 0.18]], 0.35, "soft")
+	audio.register_tone("tap", [[520.0, 0.09]], 0.45, "pluck")
+	audio.register_tone("blocked", [[150.0, 0.08]], 0.35, "pluck")
+	audio.register_tone("hint", [[880.0, 0.12], [1320.0, 0.25]], 0.3, "bell")
+	# One chime per energy color, notes of a pentatonic chord so overlaps never clash.
+	var bloom_notes := [1046.5, 1318.5, 1568.0, 1760.0]
+	for c in bloom_notes.size():
+		audio.register_tone("bloom%d" % c, [[bloom_notes[c], 0.35]], 0.25, "bell")
+	audio.register_tone("win", [[523.25, 0.11], [659.25, 0.11], [783.99, 0.11], [1046.5, 0.5]], 0.35, "bell")
+	audio.register_tone("unlock", [[784.0, 0.1], [1175.0, 0.35]], 0.35, "bell")
 
 
 # --- Progress -------------------------------------------------------------------------
@@ -129,6 +136,20 @@ func add_hints(n: int) -> void:
 	progress().hints = maxi(0, hints() + n)
 	hints_changed.emit(hints())
 	save.save_now()
+
+
+func first_clear_seeds(lv: CGLevel) -> int:
+	return int(SEEDS_FIRST_CLEAR_BY_LABEL.get(lv.difficulty.get("label", ""), SEEDS_FIRST_CLEAR))
+
+
+## Trades seeds for one hint. Returns false when the player cannot afford it.
+func buy_hint_with_seeds() -> bool:
+	if seeds() < HINT_SEED_COST:
+		return false
+	add_seeds(-HINT_SEED_COST)
+	add_hints(1)
+	analytics.track("hint_bought_with_seeds")
+	return true
 
 
 func level_record(id: String) -> Dictionary:
@@ -183,7 +204,7 @@ func complete_level(lv: CGLevel, mode: String, s: CGSession) -> Dictionary:
 		var rec := level_record(lv.id)
 		var old_stars := int(rec.get("stars", 0))
 		if rec.is_empty():
-			result.seeds += SEEDS_FIRST_CLEAR
+			result.seeds += first_clear_seeds(lv)
 		result.seeds += SEEDS_PER_STAR * maxi(0, stars - old_stars)
 		progress().levels[lv.id] = {
 			"stars": maxi(stars, old_stars),
