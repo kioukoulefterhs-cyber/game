@@ -7,6 +7,7 @@ var theme_def: Dictionary = {}
 var plants: Array = [] ## plant definitions, in planting order
 var decor: Array = [] ## decor ids
 var _t := 0.0
+var _last_draw := -1.0
 var _grow := {} ## plant id -> time it was added
 var reduce_motion := false
 
@@ -24,7 +25,10 @@ func celebrate(id: String) -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	queue_redraw()
+	# Ambient animation: 30 redraws a second is smooth enough and saves battery.
+	if _t - _last_draw >= 1.0 / 30.0:
+		_last_draw = _t
+		queue_redraw()
 
 
 func _draw() -> void:

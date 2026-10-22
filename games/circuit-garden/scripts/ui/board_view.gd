@@ -99,6 +99,10 @@ func _on_solved() -> void:
 	_win_t = _time
 
 
+const AMBIENT_FPS := 30.0
+var _last_draw := -1.0
+
+
 func note_tap(i: int) -> void:
 	_pop[i] = _time
 
@@ -123,11 +127,14 @@ func _process(delta: float) -> void:
 			_angle[i] = _turn_from[i] + diff * ease_out_back(k)
 			turning = true
 	# Redraw only while something moves: flowing energy, turns, pops, blooms, the win burst.
-	var busy := turning or (not _dist.is_empty() and not reduce_motion) \
-		or (_win_t >= 0.0 and _time - _win_t < 2.4) or _recent(_pop, 0.2) \
+	# Taps, turns and bursts redraw every frame; the ambient energy flow only at AMBIENT_FPS,
+	# which roughly halves GPU and CPU use while the player is thinking.
+	var busy := turning or (_win_t >= 0.0 and _time - _win_t < 2.4) or _recent(_pop, 0.2) \
 		or _recent(_bloom_t, BLOOM_TIME + 0.4) or _recent(_hint_flash, 1.2)
-	if busy or _animating:
+	var ambient := not _dist.is_empty() and not reduce_motion
+	if busy or _animating or (ambient and _time - _last_draw >= 1.0 / AMBIENT_FPS):
 		_animating = busy
+		_last_draw = _time
 		queue_redraw()
 
 
