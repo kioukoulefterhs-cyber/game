@@ -12,13 +12,17 @@ may record anonymous gameplay events such as level started or finished and hints
 not include your name, contacts, location or advertising ID. [In the current version these events
 stay on the device. Update this section before connecting any analytics service, naming it.]
 
-**Advertising (only when ads are enabled):** the app would show ads through Google AdMob. Google
-may collect device identifiers and usage data to serve and measure ads. In the EEA and UK you are
-asked for consent through Google's consent form before personalised ads. See
-https://policies.google.com/technologies/partner-sites.
+**Advertising (only in versions with ads enabled):** the app shows optional rewarded ads (you choose
+to watch one for a hint) and occasional ads between levels, through Google AdMob. Google may collect
+your device's advertising ID, approximate location from your IP address, app interactions and
+diagnostics to serve, measure and protect ads. In the EEA, UK and Switzerland you are asked for
+consent through Google's consent form before any ad is requested, and you can change your choice at
+any time in Settings > Ad privacy choices. Ads are limited to content rated for general audiences.
+See https://policies.google.com/technologies/partner-sites.
 
-**Purchases:** purchases are processed by Google Play. We receive a purchase token to unlock
-your item; we do not receive your payment details.
+**Purchases (only in versions with purchases enabled):** purchases are processed by Google Play. We
+receive a purchase token to unlock your item; we do not receive your payment details. [If a
+verification server is added, say what it stores and for how long.]
 
 **Children:** the app is not directed at children under 13. [Revise if targeting Families.]
 

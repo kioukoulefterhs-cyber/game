@@ -18,7 +18,7 @@
 8. **Uniqueness.** `CGSolver` searches all rotations (row-major backtracking with
    neighbour-consistency pruning). While it finds two solutions, the generator pins a tile
    where they differ to its intended rotation. In practice the rules (no leaks, exactly one
-   source per network) are strong enough that the 100 launch levels needed no pins.
+   source per network) are strong enough that almost no launch level needs a pin (one does).
 9. **Rejection rules** (the attempt is discarded):
    * start already solved, or `min_moves < max(3, free_tiles * min_scramble)`;
    * share of tiles fixed by local constraints alone `>= max_forced_ratio` (too trivial);
@@ -34,24 +34,32 @@ not guaranteed by construction.
 
 ## Difficulty
 
-`difficulty.score = free_tiles + 0.5*min_moves + 2*ln(1+search_nodes) + 4*(colors-1) + 3*crosses - 0.75*forced_tiles`.
-It is a heuristic used to order levels inside a band, not a measured player difficulty. Both
-solvers currently need no guessing on any launch level (the validator's most-constrained-cell
-search visits one node per cell), so every level can be solved by deduction alone. Real
-difficulty tuning needs playtest data, which we do not have yet.
+Measured, not guessed: `tools/level-analyzer/analyze.py` solves each level with a human-style
+logic engine and scores its reasoning effort (method and results in `docs/difficulty/README.md`).
+The generator's own `difficulty.score` is only a rough heuristic kept for reference.
+
+Each shipped level stores in `difficulty`: `band`, `params` (exact generator settings, so the level
+reproduces from its seed), `effort`, `label` (Easy/Medium/Hard/Expert), `hardest` technique needed,
+`depth` (rounds of deduction) and `kept_from_v1`.
 
 ## Campaign
 
-`games/circuit-garden/puzzles/curriculum.json` defines bands (Sprout 4x4 through Wildwood 7x7
-with four colors). Each band generates 3x candidates from consecutive seeds, sorts by score and
-picks evenly spaced ones. Regenerate and validate:
+`games/circuit-garden/puzzles/curriculum.json` (version 2) defines seven bands, each with a count,
+an effort range and one or more generator variants. `tools/level-generator/build_campaign.py`:
+
+1. dumps candidates for every variant with Godot (`tools/dump_candidates.gd`, seeds from
+   `seed_base + variant * 1000000`);
+2. adds the band's levels from the first pack (`tools/level-generator/archive/`) when `keep_v1` is set;
+3. measures every candidate and picks levels at evenly spaced effort targets, never below the
+   previous level's effort, preferring first-pack levels when they are within 1 effort point;
+4. re-validates every pick with the independent validator and writes `levels_v1.json`.
 
 ```
-tools/level-generator/generate.sh            # Linux/macOS
+tools/level-generator/generate.sh            # Linux/macOS (about 2 minutes on 4 cores)
 .\tools\level-generator\generate.ps1 -Godot <path to Godot console exe>   # Windows
 ```
 
-Regeneration is byte-identical for the same curriculum and engine version.
+The result is deterministic for the same curriculum, archive and engine version.
 
 ## Independent validator
 

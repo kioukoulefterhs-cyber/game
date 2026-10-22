@@ -51,6 +51,16 @@ func _initialize() -> void:
 		[30, func(): _shot("08_level21")],
 		[1, func(): _main.play_level(95)],
 		[30, func(): _shot("09_level96")],
+		[1, func():
+			# Half-solved Expert board: the energy reaching in from the sources.
+			var v := _board()
+			var target := v.session.level.solution_masks()
+			for i in range(0, target.size() / 2):
+				var g := 0
+				while v.session.board.is_rotatable(i) and v.session.board.mask(i) != target[i] and g < 4:
+					v.session.tap(i)
+					g += 1],
+		[30, func(): _shot("09b_level96_half")],
 		[1, func(): _main.show_screen("store")],
 		[20, func(): _shot("10_store")],
 		[1, func(): _main.show_screen("daily")],

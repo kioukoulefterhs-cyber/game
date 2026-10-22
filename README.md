@@ -9,7 +9,7 @@ from its source to its matching flowers, with no loose ends.
 | Path | What it is | State |
 |------|------------|-------|
 | `games/circuit-garden/` | The game (Godot project) | Playable: 100 levels, tutorial, daily challenge, garden, store (mock), settings |
-| `studio-core/` | Reusable services: save, settings, audio, analytics, consent, ads, billing, UI helpers | Working with mock adapters; real AdMob/Play Billing adapters are placeholders |
+| `studio-core/` | Reusable services: save, settings, audio, analytics, consent, ads, billing, UI helpers | Working with mock adapters; AdMob and Play Billing adapters written, untested on a device, switched off |
 | `templates/blank-game/` | Second-game starter that reuses studio-core | Builds, tests pass, exports an APK |
 | `tools/level-generator/` | Regenerates the level pack from `puzzles/curriculum.json` | Working, byte-reproducible |
 | `tools/level-validator/` | Independent Python validator for level packs | Working, all 100 levels pass |
@@ -41,10 +41,11 @@ The test runner fails if a copy is out of date.
   (rotate, undo, restart, hints, moves, timer, stars), tutorial, daily challenge, garden
   progression, save/load, settings, analytics with consent gating (local debug adapter only),
   ad and purchase *flows* against mock adapters, Android debug APK export.
-* **Placeholder:** `StudioAdMobAdapter` and `StudioPlayBillingAdapter` (they report "unavailable");
-  privacy and support URLs in `scripts/main.gd`; server-side purchase verification.
+* **Written but not yet run on a device:** `StudioAdMobAdapter` (test ids, UMP consent) and
+  `StudioPlayBillingAdapter`. Both are off in `config/monetization.json`.
+* **Placeholder:** privacy and support URLs in `scripts/main.gd`; server-side purchase verification.
 * **Not yet done:** testing on a real Android device, signed release AAB, Play Console setup.
-  These need the developer's machine and accounts. See `docs/release-checklist.md`.
+  These need the developer's machine and accounts. See the PASS/FAIL list in `docs/release-checklist.md`.
 
 ## Rules for this repo
 
