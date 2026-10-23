@@ -22,8 +22,13 @@ try {
     $ks = (Resolve-Path $env:GODOT_ANDROID_KEYSTORE_RELEASE_PATH).Path
     if ($ks.StartsWith($Root.Path, [System.StringComparison]::OrdinalIgnoreCase)) { throw "keystore must live outside the repository" }
     if (-not (Test-Path "android\build\build.gradle")) {
-      & $Godot --headless --install-android-build-template
-      if ($LASTEXITCODE -ne 0) { throw "could not install the Android build template" }
+      # `--install-android-build-template` hangs when run on its own in 4.7.2 headless, so do what
+      # the editor does: unpack the export templates' android_source.zip and record its version.
+      $Source = "$env:APPDATA\Godot\export_templates\4.7.2.stable\android_source.zip"
+      if (-not (Test-Path $Source)) { throw "missing $Source (install the Godot 4.7.2 export templates)" }
+      Expand-Archive $Source "android\build" -Force
+      [System.IO.File]::WriteAllText("$PWD\android\.build_version", "4.7.2.stable")
+      New-Item -ItemType File -Force "android\build\.gdignore" | Out-Null
     }
     $Out = "$Root\build\circuit-garden-release.aab"
     & $Godot --headless --export-release "Android Release AAB" $Out
